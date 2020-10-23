@@ -1,0 +1,249 @@
+---
+title: "Computational Statistics: Assignment 1"
+author: ""
+date: ""
+output: pdf_document
+---
+
+# Assignment 1: Density Smoothing
+
+##Questions: 
+
+Implement a kernel smoother using the Epanechnikov kernel and implement bandwidth selection using either UCV or Sheather-Jones. Apply the implementation to the $\log(F12)$ data (as described in Exercise 10.1 in CS, and as used in Practical Exercises 1 to 3) and compare the result with the result of using density in R.
+
+In addition to testing your implementation on the $\log(F12)$ data it is a good idea to consider simulated data as well. In particular for benchmarking and profiling. 
+
+For the Epanechnikov kernel, and other kernels with compact support, think about if you really need to
+evaluate all the terms in the sum (10.6)?
+
+```{r}
+library(microbenchmark)
+library(ggplot2)
+library(compiler)
+library(pryr)
+myData <- read.table(file = 'infrared.dat', header = T) # Reads data into R
+log_F12 <- log(myData$F12) # Extracts the F12 observations and evaluates log(F12)
+hist(log_F12, probability = T);rug(log_F12)
+```
+
+## Notes: 
+\begin{itemize}
+  \item Chapter 10 - 11
+  \item The Epanechnikov kernel is on page 339-340
+  \item The theory of Kernel Smoothers starts from page 374
+  \item UCV on page 333
+  \item Sheather-Jones on page 337.
+\end{itemize}
+
+```{r}
+
+kernel <- function(x){  # The Epanechnikov kernel as defined in the book
+                    if (abs(x) < 1) { 
+                          (3 / 4) * (1 - x^2)
+                    }
+                    else {
+                          0
+                    }
+                  } 
+
+kernel_density <- function(x, h = 0.2, n = 512){ # The kernel density estimator
+                      rg <- range(x) # the range of the vector input, y
+                      rg_seq <- seq(from = rg[1] - 3, to = rg[2] + 3, length.out = 512) 
+                      # Makes a sequence in [rg - 3, rg + 3] of size n
+                      
+                      tmp <- numeric(512) # Makes a vector of n zeros
+                      for (i in seq_along(rg_seq)){
+                          tmp[i] <- (1/0.2) * mean( sapply( (rg_seq[i] - log_F12) / 0.2 , kernel ))
+                      }
+                      
+                      list(x = rg_seq, y = tmp, h = h)
+                      
+} 
+mean(sapply((rg_seq[1] - log_F12) / 0.2, kernel))/0.2
+
+
+kernel_density_mod <- function(x, h = 0.2, n = 512){ # The kernel density estimator
+                      rg <- range(x) # the range of the vector input, y
+                      rg_seq <- seq(from = rg[1] - 3, to = rg[2] + 3, length.out = n) 
+                      # Makes a sequence in [rg - 3, rg + 3] of size n
+                      
+                      tmp <- numeric(n) # Makes a vector of n zeros
+                      for (i in seq_along(rg_seq)){
+                          tmp2 <- 0
+                          if (abs((rg_seq[i] - x[i]) / h) < 1){
+                              tmp2 <-(3 / 4) * ((rg_seq[i] - x[i])/h)^2
+                          } 
+                          tmp[i] <- tmp2
+                      }
+                      
+                      
+                      list(x = rg_seq, y = tmp, h = h)
+                      
+} 
+kernel_density_mod(log_F12, h = 0.1436839)
+
+```
+
+```{r}
+# Generic function kernel_smooth with class kernel
+kernel <- structure(list(), class = c('Epanechnikov', 'default'))
+
+kernel_function <- function(x,...) UseMethod('kernel_function')
+
+kernel_function.Epanechnikov <-function(x,...){  # The Epanechnikov kernel as defined in the book
+                    if (abs(x) < 1) { 
+                          (3 / 4) * (1 - x^2)
+                    }
+                    else {
+                          0
+                    }
+                  }  
+
+kernel_smooth.default <- function(x,...) { 'no method' }
+
+
+kernel_smoother <- function(x,...) UseMethod('kernel_smoother')
+
+kernel_smoother <- function(x, h = 0.2, n = 512,...){ # The kernel density estimator
+                      rg <- range(x) # the range of the vector input, y
+                      rg_seq <- seq(from = rg[1] - 3, to = rg[2] + 3, length.out = n) 
+                      # Makes a sequence in [rg - 3, rg + 3] of size n
+                      
+                      tmp <- numeric(n) # Makes a vector of n zeros
+                      for (i in seq_along(rg_seq)){
+                          tmp[i] <- (1/h) * mean( sapply( (rg_seq[i] - x) / h , kernel_function))
+                      }
+                      
+                      list(x = rg_seq, y = tmp, h = h)
+                      
+} 
+
+class(log_F12) <- 'Epanechnikov'
+kernel_smoother(log_F12)
+
+```
+
+
+
+We will now attempt to implement a bandwidth selection using UCV.
+```{r}
+UCV <- function(h){
+          n <- length(log_F12)
+          x <- log_F12
+          tmp <- numeric(n)
+          for (i in seq_along(x)){
+              for (j in seq_along(x)){
+                  if (i == j)
+                    {
+                      tmp[i] <- tmp[i] + 0
+                    }
+                  else 
+                    {
+                      tmp[i] <- tmp[i] + ( (1/(n^2)) * (1/((8*pi)^{1/4})) * 
+                                            dnorm(x[i]-x[j], x =  h)^{1/2} - 
+                                            (1/(n*(n-1))) * 2 * dnorm(x[i]-x[j], h))
+                    }
+              }
+          }
+            
+          (1/(2 * sqrt(pi))) * (1/(n*h)) + sum(tmp)
+        }
+
+UCV2 <- function(h){
+          n <- length(log_F12)
+          x <- log_F12
+          tmp <- matrix(data = 0, nrow = n , ncol = n)
+          for (i in seq_along(x)){
+              for (j in seq_along(x)){
+                  if (i != j)
+                    {
+                      tmp[i,j] <- ( (1/(n^2)) * (1/((8*pi)^{1/4})) * 
+                                            dnorm(x[i]-x[j], x =  h)^{1/2} - 
+                                            (1/(n*(n-1))) * 2 * dnorm(x[i]-x[j], h))
+                    }
+              }
+            
+            }
+          (1/(2 * sqrt(pi))) * (1/(n*h)) + sum(tmp)
+}
+
+UCV3 <- function(h){
+          n <- length(log_F12)
+          x <- log_F12
+          tmp <- numeric(n)
+          for (i in seq_along(x)){
+              for (j in seq_along(x)){
+                  if (i != j)
+                    {
+                      tmp[i] <- tmp[i] + ( (1/(n^2)) * (1/((8*pi)^{1/4})) * 
+                                            dnorm(x[i]-x[j], x =  h)^{1/2} - 
+                                            (1/(n*(n-1))) * 2 * dnorm(x[i]-x[j], h))
+                    }
+              }
+          }
+            
+          (1/(2 * sqrt(pi))) * (1/(n*h)) + sum(tmp)
+}
+
+UCV4 <- function(h, obs = log_F12){
+      n <- length(obs)
+      x <- obs
+      M <- outer(x,x, '-')
+      eval <- (1/(n^2)) * (1/((8*pi)^{1/4})) * dnorm(M , h)^{1/2} - (1/(n*(n-1))) * 2 * dnorm(M , h)
+      
+      return((1/(2 * sqrt(pi) * n * h)) + sum(eval))
+}
+
+
+profvis(UCV(1))
+optimize(UCV3, interval = c(0,20)) # Optimizing UCV3, gives h = 0.1436839
+optimize(UCV2, interval = c(0,20)) # Optimizing UCV2
+optimize(UCV, interval = c(0,20))  # h = 0.1436839
+optimize(UCV4, interval = c(0,20)) 
+```
+By minimizing UCV, we get a bandwidth $h = 0.1436839$. This gives the following density: (the blue graph)
+```{r}
+# My kernel_density with h = 0.1436839 compared to the density function in R
+hist(log_F12, prob = T, ylim = c(0,1), breaks = 30);par(new = T)
+lines(kernel_density(log_F12, h = 0.1436839), col = 'blue', lwd = 1)
+lines(kernel_density_mod(log_F12, h = 0.1436839), col = 'black', lwd = 1)
+lines(density(log_F12, kernel = 'epanechnikov'), col = 'red', lwd = 1)
+
+```
+As expected from a UCV procedure, the graph is very wiggly and is an example of a undersmoothed performance. It is seen that choosing a bandwidth a bit larger, that is $h \in (0.33571429, 0.66142857)$, is preferable.
+
+```{r}
+hist(log_F12, prob = T, ylim = c(0,1));par(new = T)
+lines(kernel_density(log_F12, h = 0.33571429), col = 'green', lwd = 1)
+lines(kernel_density(log_F12, h = 0.49857143), col = 'red', lwd = 1)
+lines(kernel_density(log_F12, h = 0.66142857), col = 'black', lwd = 1)
+```
+
+# Comparing to the density function in R
+```{r}
+hist(log_F12, prob = T, ylim = c(0,1));par(new = T)
+lines(kernel_density(log_F12, h = 0.5), col = 'blue', lwd = 2)
+lines(density(log_F12, kernel = 'epanechnikov'), col = 'red', lwd = 1)
+```
+
+Testing time via microbenchmark
+```{r}
+tmp <- microbenchmark(kernel_density(log_F12, h = 0.49857143), 
+                      kernel_density_mod(log_F12, h = 0.49857143),
+                      density(log_F12, kernel = 'epanechnikov'))
+
+tmp
+```
+```{r, eval=FALSE, include=FALSE}
+m <- 2^(5:11)
+resKern <- cbind(m, aggregate(time ~ expr, tmp, median))
+p <- qplot(m, time, data = resKern, size = I(4)) + 
+  scale_x_continuous(trans = "log2") + 
+  scale_y_continuous(trans = "log2", limits = c(1e5, 1e8)) + 
+  geom_point(data = resDens, size = I(4), color = I("red"))
+
+```
+
+
+
+
