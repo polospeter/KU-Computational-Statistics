@@ -1,0 +1,582 @@
+---
+title: ''
+author: ""
+date: ""
+output:
+  html_document: default
+  pdf_document: default
+---
+# Assigntment 3 EM Algorithm
+
+```{r}
+library(microbenchmark)
+library(numDeriv)
+library(ggplot2)
+library(profvis)
+library(compiler)
+myData <- read.table(file = 'hivrisk.dat', header = T)
+
+```
+```{r}
+pi_func <- function(theta, i){
+      a <- theta[1]
+      b <- theta[2]
+      mu <- theta[3]
+      lambda <- theta[4]
+      if (i != 0){
+         b * mu^i * exp(- mu) + (1 - a - b) * lambda^i * exp(- lambda)
+      }
+      else {
+        a + b * mu^i * exp(- mu) + (1 - a - b) * lambda^i * exp(- lambda)
+      }
+}
+
+z_func <- function(theta){ theta[1] / pi_func(theta, 0) }
+
+t_func <- function(theta, i){ (theta[2] * theta[3]^i * exp(- theta[3])) / (pi_func(theta, i)) }
+
+p_func <- function(theta, i){
+            ( (1 - theta[1] - theta[2]) * theta[4]^i * exp(-theta[4]) ) / (pi_func(theta, i) )
+}
+
+n <- function(obs, i){
+      subset(obs[,2], obs$encounters == i)
+}
+eval_b <- function(obs, theta){
+            m <- dim(obs)[1]
+            count <- sum(obs[2])
+            result <- numeric(m)
+            for (i in seq_along(result) ) {
+              result[i] <- n(obs,i - 1) * t_func(theta, i - 1)
+            }
+            return ((1 / count) * sum(result))
+}
+eval_mu <- function(obs, theta){
+            m <- dim(obs)[1]
+            result1 <- numeric(m)
+            result2 <- numeric(m)
+            for (i in 1:m ) {
+              result1[i] <- n(obs,i - 1) * t_func(theta, i - 1)
+              result2[i] <- (i-1) * n(obs,i - 1) * t_func(theta, i - 1)
+            }
+            return( sum(result2) / sum(result1) )
+}  
+eval_lambda <- function(obs, theta){
+                m <- dim(obs)[1]
+                result1 <- numeric(m)
+                result2 <- numeric(m)
+                for (i in 1:m ) {
+                  result1[i] <- n(obs,i - 1) * p_func(theta, i - 1)
+                  result2[i] <- (i-1) * n(obs,i - 1) * p_func(theta, i - 1)
+                }
+            return( sum(result2) / sum(result1))
+}
+
+# Recursive EM algorithm
+EMrecurvise <- function(theta, obs = myData, crit = 1e-7 ){
+        # Checks for conditions
+        if (theta[1] > 1 || theta[1] < 0 ||  theta[2] > 1 || 
+            theta[2] < 0 || theta[3] < 0 ||   theta[4] <= 0 || 
+            1 - theta[1] - theta[2] <= 0 || 1 - theta[1] - theta[2] > 1) 
+        { return(Inf) }
+        
+        # Evaluate new theta
+        n_0 <- n(obs,0)              # The frequency of 0 encounters
+        n <- sum(obs[2])             # Total frequency (The data should give 1500)
+        a <- n_0 * z_func(theta)/n   # Alpha
+        b <- eval_b(obs, theta)      # Beta
+        m <- eval_mu(obs, theta)     # mu
+        l <- eval_lambda(obs, theta) # lambda
+        
+        newtheta <- c(a,b,m, l)
+        
+        if (t(theta - newtheta) %*% (theta - newtheta) < crit) {
+            return(newtheta)
+        }
+        
+        EMrecurvise(newtheta, obs)
+        
+}
+
+# EM algorithm by while loop
+EMloop <- function(theta, obs = myData, crit = 1e-7){
+        # Checks for conditions
+       if ( theta[1] > 1 || theta[1] < 0 ||  theta[2] > 1 || 
+            theta[2] < 0 || theta[3] < 0 ||   theta[4] <= 0 || 
+            1 - theta[1] - theta[2] <= 0 || 1 - theta[1] - theta[2] >= 1) 
+        { return(Inf) }
+        
+        # Evaluate new theta
+        n_0 <- n(obs,0)              # The frequency of 0 encounters
+        n <- sum(obs[2])             # Total frequency (The data should give 1500)
+        a <- n_0 * z_func(theta)/n   # Alpha
+        b <- eval_b(obs, theta)      # Beta
+        m <- eval_mu(obs, theta)     # mu
+        l <- eval_lambda(obs, theta) # lambda
+        newtheta <- c(a,b,m, l)
+        
+        while ( t(theta - newtheta) %*% (theta - newtheta)  > crit) 
+              {
+              theta <- newtheta
+              a <- n_0 * z_func(newtheta)/n
+              b <- eval_b(obs, newtheta)
+              m <- eval_mu(obs, newtheta)
+              l <- eval_lambda(obs, newtheta)
+              
+              newtheta <- c(a,b,m, l)
+        }
+        
+        return(newtheta)
+}
+
+# EM algorithm by tmax loops
+EMloop2 <- function(theta, obs = myData, tmax = 50){
+        
+        # Checks for conditions
+        if (theta[1] > 1 || theta[1] < 0 ||  theta[2] > 1 || 
+            theta[2] < 0 || theta[3] <= 0 ||   theta[4] <= 0 || 
+            1 - theta[1] - theta[2] <= 0 || 1 - theta[1] - theta[2] >= 1) 
+        { return(Inf) }
+        
+  
+        n_0 <- n(obs,0)  # The frequency of 0 encounters
+        n <- sum(obs[2]) # Total frequency (The data should give 1500)
+        
+        for (j in 1:tmax){
+              a <- n_0 * z_func(theta)/n          # Updates alpha
+              b <- eval_b(obs, theta)             # Updates beta
+              mu <- eval_mu(obs, theta)           # Updates mu
+              lambda <- eval_lambda(obs, theta)   # Updates lambda
+              
+              theta <- c(a,b,mu, lambda)          # Makes a vector of the updated parameters
+        }
+        
+        return(theta)
+}
+
+
+test_theta <- c(0.2, 0.4, 3, 4)
+
+EMrecurvise(test_theta, myData)
+profvis(EMloop(test_theta, myData))
+EMloop2(test_theta, myData, tmax = 50)
+
+profvis(EMloop2(test_theta, myData, tmax = 10000))
+```
+```{r}
+benchmarktest <- microbenchmark(EMrecurvise(testtheta, myData, crit = 1e-11), 
+                                EMrecurvise(testtheta, myData, crit = 1e-12),
+                                EMrecurvise(testtheta, myData, crit = 1e-13),
+                                EMrecurvise(testtheta, myData, crit = 1e-14),
+                                EMrecurvise(testtheta, myData, crit = 1e-15),
+                                EMloop(testtheta, myData, crit = 1e-11), 
+                                EMloop(testtheta, myData, crit = 1e-12),
+                                EMloop(testtheta, myData, crit = 1e-13),
+                                EMloop(testtheta, myData, crit = 1e-14),
+                                EMloop(testtheta, myData, crit = 1e-15),
+                                EMloop2(testtheta, myData, tmax = 50),
+                                EMloop2(testtheta, myData, tmax = 100),
+                                EMloop2(testtheta, myData, tmax = 150),
+                                EMloop2(testtheta, myData, tmax = 200),
+                                EMloop2(testtheta, myData, tmax = 250),
+                                EMloop2(testtheta, myData, tmax = 300), times = 50
+                                )
+benchmarktest
+
+
+```
+
+```{r}
+benchmarktest2 <- microbenchmark(EMrecurvise(testtheta, myData, crit = 1e-15), 
+                                EMloop(testtheta, myData, crit = 1e-15), 
+                                EMloop2(testtheta, myData, tmax = 50)
+                                )
+benchmarktest2
+```
+
+
+
+```{r}
+benchmarkRecursive <- microbenchmark(EMrecurvise(testtheta, myData, crit = 1e-1),
+                                EMrecurvise(testtheta, myData, crit = 1e-2), 
+                                EMrecurvise(testtheta, myData, crit = 1e-3),
+                                EMrecurvise(testtheta, myData, crit = 1e-4),
+                                EMrecurvise(testtheta, myData, crit = 1e-5),
+                                EMrecurvise(testtheta, myData, crit = 1e-6),
+                                EMrecurvise(testtheta, myData, crit = 1e-7))
+
+benchmarktestWhile <- microbenchmark(EMloop(testtheta, myData, crit = 1e-1),
+                                EMloop(testtheta, myData, crit = 1e-2), 
+                                EMloop(testtheta, myData, crit = 1e-3),
+                                EMloop(testtheta, myData, crit = 1e-4),
+                                EMloop(testtheta, myData, crit = 1e-5),
+                                EMloop(testtheta, myData, crit = 1e-6),
+                                EMloop(testtheta, myData, crit = 1e-7))
+
+```
+
+
+```{r}
+
+# The observed loglikelihood-function
+loglikeli <- function(theta, obs = myData){
+              if ( theta[1] > 1 || theta[1] < 0 ||  theta[2] > 1 || 
+                theta[2] < 0 || theta[3] <= 0 ||   theta[4] <= 0 || 
+                1 - theta[1] - theta[2] < 0 || 1 - theta[1] - theta[2] > 1) 
+              {return(Inf) }
+  
+              tmp <- numeric(dim(obs)[1])
+              
+              for (i in seq_along(tmp)){
+                  tmp[i] <-  n(obs, i - 1) * (log(pi_func(theta, i - 1)) - log(factorial(i-1)))
+              }
+              return( -sum(tmp) )
+}
+
+# The maximization by optim function in R. This also return the hessian matrix/observed information
+A <- optim(c(0.2,0.4, 3 , 4), loglikeli, obs = myData, hessian = T)$hessian
+diag(solve(A))
+
+```
+
+```{r}
+# Comparing the MLE obtained from the EM algorithm and the MLE obtained from Optim function in R.
+test_theta <- c(0.2, 0.4, 3, 4)
+EMr  <- EMrecurvise(test_theta, myData)
+EMl1 <- EMloop(test_theta, myData)
+EMl2 <- EMloop2(test_theta, myData, tmax = 50)
+opt  <- optim(test_theta, loglikeli, obs = myData, hessian = T)$par
+
+M <- matrix(nrow = 4, ncol = 5)
+colnames(M) <- c('Function', 'alpha', 'beta', 'mu', 'lambda')
+M[1,] <- c('EMrecursive', EMr[1], EMr[2], EMr[3], EMr[4])
+M[2,] <- c('EMloop', EMl1[1], EMl1[2], EMl1[3], EMl1[4])
+M[3,] <- c('EMloop2', EMl2[1], EMl2[2], EMl2[3], EMl2[4])
+M[4,] <- c('Optim', opt[1], opt[2], opt[3], opt[4])
+
+data.frame(M)
+```
+
+
+
+```{r}
+# Observed likelihood function
+Q <- function(theta, thetaT, obs = myData){
+        a <- theta[1]
+        b <- theta[2]
+        m <- theta[3]
+        l <- theta[4]
+  
+        tmp1 <- z_func(thetaT) * n(obs, 0) * log(a)
+        tmp2 <- numeric(17)
+        tmp3 <- numeric(17)
+        
+        for (i in seq_along(tmp2)){
+            tmp2[i] <- t_func(thetaT, i - 1) * n(obs, i - 1) * log(b * m^(i-1) * exp(-m) / factorial(i-1))
+        }
+        
+        for (i in seq_along(tmp3)){
+            tmp3[i] <- p_func(thetaT, i - 1) * n(obs, i - 1) * log((1 - a - b) * l^(i-1) * exp(-l) / factorial(i-1))
+        }
+        
+        out <- -(tmp1 + sum(tmp2) + sum(tmp3))
+        
+        return(out)
+}
+
+# A function that computes the Fischer information
+Fischer_information <- function(Q, theta){
+        l <- length(theta)
+        I <- diag(1,l)
+        A <- optim(theta, loglikeli, obs = myData, hessian = T)$hessian
+        
+        psi <- function(par){ 
+            c(n(myData, 0) * z_func(par)/1500, 
+            eval_b(myData, par), 
+            eval_mu(myData, par), 
+            eval_lambda(myData, par))
+            }
+        
+        Dpsi <- jacobian(psi, theta)
+        iY <- hessian(Q, theta, thetaT = theta)
+        iX <- (I - t(Dpsi)) %*% iY
+        iYinv <- solve(iY)
+        VarTheta  <- iYinv + iYinv %*% t(solve(I - Dpsi, Dpsi))
+        
+        # Makes a table of the results
+        M1 <- matrix(nrow = 2, ncol = 4)
+        colnames(M1) <- c('alpha', 'beta', 'mu', 'lambda')
+        rownames(M1) <- c('Variance', 'Standard error')
+        M1[1,] <- diag(VarTheta)
+        M1[2,] <- sqrt(diag(VarTheta))
+
+        M2 <- matrix(nrow = 2, ncol = 4)
+        colnames(M2) <- c('alpha', 'beta', 'mu', 'lambda')
+        rownames(M2) <- c('Variance', 'Standard error')
+        M2[1,] <- diag(solve(A))
+        M2[2,] <- sqrt(diag(solve(A)))
+        
+        list('Variance of the estimates from EM algorithm' = M1, 
+             'Variance of the MLE from the optim function' = M2)
+}
+
+theta <- c(0.1222474, 0.5625253, 1.4673979, 5.9382800) # MLE from optim
+Fischer_information(Q, theta)
+
+
+Estimate_psi <- function(initial_theta, t = 1000){
+              n <- sum(myData[2])
+              max_theta <- EM(initial_theta)
+              m <- length(initial_theta)
+              r <- matrix(data = 0, ncol = m, nrow = m)
+              
+              psi <- function(par){ 
+                      c(n(myData, 0) * z_func(par)/1500, 
+                      eval_b(myData, par), 
+                      eval_mu(myData, par), 
+                      eval_lambda(myData, par))
+              }
+              
+
+              
+              
+              for (j in 1:m){
+                   # Makes theta_t with MLE on all cells except the jth cell
+                    theta_t <- max_theta
+                    theta_t[j] <- initial_theta[j]
+                    for (i in 1:m){
+                      
+                        for (k in 1:t){
+                          tmp <- theta_t
+                          theta_t <- psi(theta_t)
+                          
+                        }
+                         r[i,j] <- (theta_t[i] - max_theta[i])/(tmp[j] - max_theta[j])
+                        
+                    }
+                    
+                  
+                             
+              }
+              iY <- hessian(Q, initial_theta, thetaT = initial_theta)
+        
+              VarTheta <- solve(iY) %*% ( I + (t(r) %*% solve( I - t(r))))
+              
+              M <- matrix(nrow = 2, ncol = 4)
+              colnames(M) <- c('alpha', 'beta', 'mu', 'lambda')
+              rownames(M) <- c('Variance', 'Standard error')
+              M[1,] <- diag(VarTheta)
+              M[2,] <- sqrt(diag(VarTheta))
+              return(M)
+}
+
+t <- Estimate_psi(c(0.3, 0.6, 4, 8))
+Estimate_psi(c(0.3, 0.6, 4, 8), t = 100)
+Fischer_information(Q, c(0.3, 0.6, 1, 8))
+```
+
+
+```{r}
+# Simulation 
+sim <- function(par, guess = c(0.2, 0.6, 6, 10) ){
+        a <- par[1]
+        b <- par[2]
+        m <- par[3]
+        l <- par[4]
+        count <- 10000
+        
+        # Simulation of the three groups
+        simLambda <- rpois( (1 - a - b ) * count, l)
+        simMu <- rpois( b * count, m)
+        simAlpha <- rbinom( count, 1, a )
+        
+        # new data
+        newData <- myData 
+        for (i in 1:17){ 
+          newData[i,2] <- 0 
+          }
+        
+        newData[1,2] <- length(simAlpha[ simAlpha == 1 ])
+        
+        for (i in 1:17){
+          newData[i, 2] <- newData[i, 2]  + length(simLambda[simLambda == i - 1]) + length(simMu[simMu == i - 1])
+        }
+        
+        I <- diag(1,4)
+
+        psi <- function(par){ 
+                c(n(newData, 0) * z_func(par)/sum(newData[,2]), 
+                eval_b(newData, par), 
+                eval_mu(newData, par), 
+                eval_lambda(newData, par))
+        }
+        Dpsi <- jacobian(psi, par)
+        iY <- hessian(Q, par, thetaT = par)
+        VarEst <- solve(iY) %*% ( I + (t(Dpsi) %*% solve( I - t(Dpsi) ) ))
+        
+        A <- optim(guess, loglikeli, obs = newData, hessian = T)$hessian
+        
+        
+        # Output
+        cat(' EMloop: ', EMloop( guess, newData), '\n', 'True parameter: ', par, '\n','\n')
+}
+
+
+par1 <- c(0.1221976, 0.5624883, 1.4678518, 5.9390130)
+par2 <- c(0.3, 0.6, 4, 8)
+par3 <- c(0.2, 0.3, 3, 6)
+par4 <- c(0.4, 0.3, 5, 4)
+sim(par4, guess = c(0.3, 0.3, 4, 3))
+est1 <- sim(par1)
+est2 <- sim(par2)
+est3 <- sim(par3)
+est4 <- sim(par4)
+est5 <- sim(par4, guess = c(0.3, 0.3, 4, 3))
+
+
+est3
+```
+
+```{r, echo=FALSE}
+# Convergence with criteria
+
+temp <- matrix(nrow = 20, ncol = 5)
+colnames(temp) <- c("alpha", "beta", "mu", "lambda", 'Criteria')
+par <- c(0.2, 0.6, 6, 10)
+
+EMtemp2 <- matrix(nrow = 20, ncol = 4)
+EMtemp2[1,] <- EMloop(theta = par, obs = myData, crit = 1e-1)
+EMtemp2[2,] <- EMloop(theta = par, obs = myData, crit = 1e-2)
+EMtemp2[3,] <- EMloop(theta = par, obs = myData, crit = 1e-3)
+EMtemp2[4,] <- EMloop(theta = par, obs = myData, crit = 1e-4)
+EMtemp2[5,] <- EMloop(theta = par, obs = myData, crit = 1e-5)
+EMtemp2[6,] <- EMloop(theta = par, obs = myData, crit = 1e-6)
+EMtemp2[7,] <- EMloop(theta = par, obs = myData, crit = 1e-7)
+EMtemp2[8,] <- EMloop(theta = par, obs = myData, crit = 1e-8)
+EMtemp2[9,] <- EMloop(theta = par, obs = myData, crit = 1e-9)
+EMtemp2[10,] <- EMloop(theta = par, obs = myData, crit = 1e-10)
+EMtemp2[11,] <- EMloop(theta = par, obs = myData, crit = 1e-11)
+EMtemp2[12,] <- EMloop(theta = par, obs = myData, crit = 1e-12)
+EMtemp2[13,] <- EMloop(theta = par, obs = myData, crit = 1e-13)
+EMtemp2[14,] <- EMloop(theta = par, obs = myData, crit = 1e-14)
+EMtemp2[15,] <- EMloop(theta = par, obs = myData, crit = 1e-15)
+EMtemp2[16,] <- EMloop(theta = par, obs = myData, crit = 1e-16)
+EMtemp2[17,] <- EMloop(theta = par, obs = myData, crit = 1e-17)
+EMtemp2[18,] <- EMloop(theta = par, obs = myData, crit = 1e-18)
+EMtemp2[19,] <- EMloop(theta = par, obs = myData, crit = 1e-19)
+EMtemp2[20,] <- EMloop(theta = par, obs = myData, crit = 1e-20)
+EMtemp2
+
+temp[1, ] <- c( EMtemp2[1,1], EMtemp2[1,2], EMtemp2[1,3], EMtemp2[1,4],  1e-1)
+temp[2, ] <- c( EMtemp2[2,1], EMtemp2[2,2], EMtemp2[2,3], EMtemp2[2,4],  1e-2)
+temp[3, ] <- c( EMtemp2[3,1], EMtemp2[3,2], EMtemp2[3,3], EMtemp2[3,4],  1e-3)
+temp[4, ] <- c( EMtemp2[4,1], EMtemp2[4,2], EMtemp2[4,3], EMtemp2[4,4],  1e-4)
+temp[5, ] <- c( EMtemp2[5,1], EMtemp2[5,2], EMtemp2[5,3], EMtemp2[5,4],  1e-5)
+temp[6, ] <- c( EMtemp2[6,1], EMtemp2[6,2], EMtemp2[6,3], EMtemp2[6,4],  1e-6)
+temp[7, ] <- c( EMtemp2[7,1], EMtemp2[7,2], EMtemp2[7,3], EMtemp2[7,4],  1e-7)
+temp[8, ] <- c( EMtemp2[8,1], EMtemp2[8,2], EMtemp2[8,3], EMtemp2[8,4],  1e-8)
+temp[9, ] <- c( EMtemp2[9,1], EMtemp2[9,2], EMtemp2[9,3], EMtemp2[9,4],  1e-9)
+temp[10, ] <- c( EMtemp2[10,1], EMtemp2[10,2], EMtemp2[10,3], EMtemp2[10,4],  1e-10)
+temp[11, ] <- c( EMtemp2[11,1], EMtemp2[11,2], EMtemp2[11,3], EMtemp2[11,4],  1e-11)
+temp[12, ] <- c( EMtemp2[12,1], EMtemp2[12,2], EMtemp2[12,3], EMtemp2[12,4],  1e-12)
+temp[13, ] <- c( EMtemp2[13,1], EMtemp2[13,2], EMtemp2[13,3], EMtemp2[13,4],  1e-13)
+temp[14, ] <- c( EMtemp2[14,1], EMtemp2[14,2], EMtemp2[14,3], EMtemp2[14,4],  1e-14)
+temp[15, ] <- c( EMtemp2[15,1], EMtemp2[15,2], EMtemp2[15,3], EMtemp2[15,4],  1e-15)
+temp[16, ] <- c( EMtemp2[16,1], EMtemp2[16,2], EMtemp2[16,3], EMtemp2[16,4],  1e-16)
+temp[17, ] <- c( EMtemp2[17,1], EMtemp2[17,2], EMtemp2[17,3], EMtemp2[17,4],  1e-17)
+temp[18, ] <- c( EMtemp2[18,1], EMtemp2[18,2], EMtemp2[18,3], EMtemp2[18,4],  1e-18)
+temp[19, ] <- c( EMtemp2[19,1], EMtemp2[19,2], EMtemp2[19,3], EMtemp2[19,4],  1e-19)
+temp[20, ] <- c(EMtemp2[20,1], EMtemp2[20,2], EMtemp2[20,3], EMtemp2[20,4],  1e-20)
+
+
+# Convergence of EMloop
+temp
+```
+
+```{r}
+
+pi_func <- function(theta, i){
+      a <- theta[1]
+      b <- theta[2]
+      mu <- theta[3]
+      lambda <- theta[4]
+      if (i != 0){
+         b * mu^i * exp(- mu) + (1 - a - b) * lambda^i * exp(- lambda)
+      }
+      else {
+        a + b * mu^i * exp(- mu) + (1 - a - b) * lambda^i * exp(- lambda)
+      }
+}
+
+z_func <- function(theta){ theta[1] / pi_func(theta, 0) }
+
+t_func <- function(theta){ 
+          t_vec <- 0
+          for (i in 1:17){
+            t_vec[i] <- (theta[2] * theta[3]^{i-1} * exp(- theta[3])) / (pi_func(theta, i-1))
+          }
+          return(t_vec)
+        }
+
+p_func <- function(theta){
+          p_vec <- 0
+          for (i in 1:17){
+            p_vec[i] <- ( (1 - theta[1] - theta[2]) * theta[4]^{i-1} * exp(-theta[4]) ) / (pi_func(theta, i-1) ) 
+          }
+          return(p_vec)
+}
+
+EM_mod <- function(theta, obs = myData, crit = 1e-7){
+        # Checks for conditions
+       if ( theta[1] > 1 || theta[1] < 0 ||  theta[2] > 1 || 
+            theta[2] < 0 || theta[3] < 0 ||   theta[4] <= 0 || 
+            1 - theta[1] - theta[2] <= 0 || 1 - theta[1] - theta[2] >= 1) 
+       { return(Inf) }
+  
+        N <- sum(obs[2])
+        n_vec <- obs$frequency / N
+        i_n_vec <- obs$frequency * 0:16
+        n_0 <- subset(obs[,2], obs$encounters == 0)  # The frequency of 0 encounters
+        
+        a <- (n_0/N) * z_func(theta)
+        b <- sum(n_vec * t_func(theta))
+        m <- sum(i_n_vec * t_func(theta)) / sum(n_vec * t_func(theta))
+        l <- sum(i_n_vec * p_func(theta)) / sum(n_vec * p_func(theta))
+        newtheta <- c(a,b,m, l)
+        
+        # EM step until criteria is met
+        while ( t(theta - newtheta) %*% (theta - newtheta)  > crit) 
+              {
+              a <- (n_0/N) * z_func(newtheta)
+              b <- sum(n_vec * t_func(newtheta))
+              m <- sum(i_n_vec * t_func(newtheta))/sum(n_vec * t_func(newtheta))
+              l <- sum(i_n_vec * p_func(newtheta))/sum(n_vec * p_func(newtheta))
+              
+              newtheta <- c(a,b,m, l)
+        }
+              
+  
+        return(newtheta)
+}
+theta <- testheta <- c(0.01, 0.01, 1, 1.001)
+EM_mod(testheta)
+obs <- myData
+```
+
+
+```{r}
+# Object orientated
+HIV <- structure(
+  list( theta = c(0.01, 0.01, 1, 1.001),
+        prob = function(p) {
+          p[3] <- 1 - p[1] - p[2]
+          c(p[1]^2, 2 * p[1] * p[2], 2* p[1] * p[3], 
+          p[2]^2, 2 * p[2] * p[3], p[3]^2)
+    }
+  ), 
+  class = "study"
+)
+
+
+```
+
