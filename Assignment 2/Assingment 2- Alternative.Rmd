@@ -1,0 +1,517 @@
+---
+title: ""
+author: ""
+date: ""
+output: pdf_document
+---
+
+# Assignments: Univariate Simulation
+
+## Rejection sampling
+
+```{r}
+library("ggplot2")
+eq <- function(x){ exp(- x^3 + x) }
+envolope1 <- function(x){ exp(- x^2 / 2) / 0.52 }
+d <- seq(from  = 0, to = 5, 0.00001)
+
+ggplot(data.frame( x =  d) , aes(x = x) ) + stat_function(fun = eq, geom = "line") + xlab("x") + ylab("y") + stat_function(fun = envolope1, geom="line", colour = 'red' )
+
+```
+```{r}
+rejection_sampling <- function(f, 
+                               envolope,
+                               number_of_iteration = 50){
+        samples <- 0
+        
+        i <- 1
+        while( i < number_of_iteration){
+                y <- rnorm(1)
+                u <- runif(1)
+                if (u <= (f(y) / envolope(y)) & y >= 0) {
+                     samples[i] <- y
+                     i <- i + 1
+                }
+
+        }
+        
+        samples
+}
+
+hist(rejection_sampling(f = eq,  envolope = envolope1 , number_of_iteration =  100000), breaks = 100, freq = F)
+
+```
+
+```{r}
+flog <- function(x){log(exp(- x^3 + x))}
+ggplot(data.frame( x =  seq(from  = 0, to = 5, 0.00001)) , aes(x = x) ) + stat_function(fun = flog, geom = "line") + xlab("x") + ylab("y")
+```
+
+
+
+
+
+```{r}
+
+flog <- function(x){-(x^3) + x}
+env1 <- function(x){
+                   logf(x_values[1]) + (x - x_values[1]) * logfprime(x_values[1])
+            }
+env2 <- function(x){
+                   logf(x_values[2]) + (x - x_values[2]) * logfprime(x_values[2])
+            }
+env3 <- function(x){
+                   logf(x_values[3]) + (x - x_values[3]) * logfprime(x_values[3])
+}
+
+env4 <- function(x){
+                   logf(x_values[4]) + (x - x_values[4]) * logfprime(x_values[4])
+}
+
+env5 <- function(x){
+                   logf(x_values[5]) + (x - x_values[5]) * logfprime(x_values[5])
+}
+env6 <- function(x){
+                   logf(x_values[6]) + (x - x_values[6]) * logfprime(x_values[6])
+            }
+
+ggplot(data.frame( x = 0), mapping = aes(x = x)) + stat_function(fun = flog, geom = "line")  + xlab("x") + ylab("y") + stat_function(fun = env1, geom = "line", colour = 'blue' , xlim = c(0,z[1])) + stat_function(fun = env2, geom = "line", colour = 'blue', xlim = c(z[1],z[2]) ) + stat_function(fun = env3, geom = "line", colour = 'blue' , xlim = c(z[2], z[3])) + stat_function(fun = env4, geom = "line", colour = 'blue', xlim = c(z[3], z[4]) ) + stat_function(fun = env5, geom = "line", colour = 'blue', xlim = c(z[4], z[5]) ) + stat_function(fun = env6, geom = "line", colour = 'blue', xlim = c(z[5], 5) )  + ylim(0,1) + xlim(0,1)
+```
+
+
+
+
+
+```{r}
+
+# The envelope we get
+f <- function(x){exp(- x^3 + x)}
+
+env1exp <- function(x){
+                   exp(logf(x_values[1]) + (x - x_values[1]) * logfprime(x_values[1]))
+            }
+env2exp <- function(x){
+                   exp(logf(x_values[2]) + (x - x_values[2]) * logfprime(x_values[2]))
+            }
+env3exp <- function(x){
+                   exp(logf(x_values[3]) + (x - x_values[3]) * logfprime(x_values[3]))
+}
+
+env4exp <- function(x){
+                   exp(logf(x_values[4]) + (x - x_values[4]) * logfprime(x_values[4]))
+}
+
+env5exp <- function(x){
+                   exp(logf(x_values[5]) + (x - x_values[5]) * logfprime(x_values[5]))
+}
+env6exp <- function(x){
+                   exp(logf(x_values[6]) + (x - x_values[6]) * logfprime(x_values[6]))
+            }
+ggplot(data.frame( x =  seq(from  = 0, to = 5, 0.001)) , aes(x = x) ) + stat_function(fun = f, geom = "line") + xlab("x") + ylab("y") + stat_function(fun = env1exp, geom = "line", colour = 'blue' , xlim = c(0,z[1])) + stat_function(fun = env2exp, geom = "line", colour = 'blue', xlim = c(z[1],z[2]) ) + stat_function(fun = env3exp, geom = "line", colour = 'blue' , xlim = c(z[2], z[3])) + stat_function(fun = env4exp, geom = "line", colour = 'blue', xlim = c(z[3], z[4]) ) + stat_function(fun = env5exp, geom = "line", colour = 'blue', xlim = c(z[4], z[5]) ) + stat_function(fun = env6exp, geom = "line", colour = 'blue', xlim = c(z[5], 5) ) 
+```
+
+
+```{r}
+# New try
+
+adaptive_rejection_sampling2 <- function( f,
+                                         logf, 
+                                         logfprime,
+                                         x_values,
+                                         number_of_iterations = 10000){
+            # Z_i points. 
+            z <- 0
+            k <- length(x_values)
+            for (i in 1:(k-1) ){
+                z[i] <- (logf(x_values[i+1]) - logf(x_values[i]) - x_values[i+1] * logfprime(x_values[i+1])
+                           + x_values[i] * logfprime(x_values[i]) ) / (logfprime(x_values[i]) - 
+                                                                        logfprime(x_values[i+1]))
+            }
+            
+            # Envelope
+            env <- function(x, i){
+                   logf(x_values[i]) + (x - x_values[i]) * logfprime(x_values[i])
+            }
+            
+            exp_env <- function(x, i){
+                  exp(logf(x_values[i]) + (x - x_values[i]) * logfprime(x_values[i]))
+            }
+            
+            # Squeeze function
+            squeeze_func <- function(x, i){
+                  ((x_values[i] - x) * logf(x_values[i]) + (x - x_values[i]) * logf(x_values[i + 1])) / 
+                  (x_values[i + 1] - x_values[i]) 
+              }
+            
+            Integrals <- numeric(k-1)
+            Integrals[1] <- integrate(function(x) exp(logf(x_values[1]) + (x - x_values[1]) * logfprime(x_values[1])),
+                                      lower = 0, upper = z[1])$value
+            for (i in 2:(k-1) ){
+                Integrals[i] <- integrate(function(x) exp(logf(x_values[i]) + (x - x_values[i])*logfprime(x_values[i])), 
+                          lower = z[i-1], upper = z[i])$value
+            }
+            
+            samples <- 0
+            Integrals <- Integrals/sum(Integrals)
+            j <- 1
+            while (length(samples) < number_of_iterations){
+                u <- runif(1)
+                u2 <- runif(1)
+                
+                i <- 1
+                Area <- 0
+                while (u - Area > 0){
+                    i <- i + 1
+                    Area <- sum(Integrals[1:i])
+                    
+                }
+                
+                i <- ifelse(i == 1, 1, i - 1)
+              
+                if (i == 1){
+                    a <- logf(x_values[i])
+                    b <- logfprime(x_values[i])
+                    y <- x_values[i]
+                    c <- (1/b) * exp(a - y*b)
+                    x <- (log((u + c) * b) + y * b - a)/b
+              
+                } else {
+                    Area <- sum(Integrals[1:i])
+                    a <- logf(x_values[i])
+                    b <- logfprime(x_values[i])
+                    y <- x_values[i]
+                    
+                    y2 <- z[i]
+                    c <- (1/b) * exp(y2*b + a - y * b)
+                    c <- c - Area
+                    root <- (log((u + c) * b) + y * b - a)/b
+                    x <- root
+                }
+               
+                
+                if (u2 <= (f(x) / exp_env(x,i)) ) {
+                      samples[j] <- x
+                      j <- j + 1
+                }
+                
+
+              }
+            
+            samples
+            
+}
+
+x_values <- seq(0, 2.5 , length.out = 25)
+ff <- function(x){exp(- x^3 + x)}
+flog <- function(x){- x^3 + x}
+fprime <- function(x){-3*x^2 + 1}
+r <- adaptive_rejection_sampling2(ff, flog, fprime , x_values, number_of_iterations = 100000)
+hist(r)
+```
+
+```{r}
+adaptive_rejection_sampling <- function( f,
+                                         logf, 
+                                         logfprime,
+                                         x_values, 
+                                         number_of_samples = 10000){
+  
+            # Z_i points. 
+            z <- 0
+            k <- length(x_values)
+            for (i in 1:(k-1) ){
+                z[i] <- (logf(x_values[i+1]) - logf(x_values[i]) - x_values[i+1] * logfprime(x_values[i+1])
+                           + x_values[i] * logfprime(x_values[i]) ) / (logfprime(x_values[i]) - 
+                                                                        logfprime(x_values[i+1]))
+            }
+            
+            # piecewise Envelope
+            env <- function(x, i){
+                   logf(x_values[i]) + (x - x_values[i]) * logfprime(x_values[i])
+            }
+            
+            # Exponential piecewise envelope
+            exp_env <- function(x, i){
+                  exp(logf(x_values[i]) + (x - x_values[i]) * logfprime(x_values[i]))
+            }
+            
+            Integrals <- numeric(k-1)
+            Integrals[1] <- integrate(function(x) exp(logf(x_values[1]) + (x - x_values[1]) * logfprime(x_values[1])),
+                                      lower = 0, upper = z[1])$value
+            for (i in 2:(k-1) ){
+                Integrals[i] <- integrate(function(x) exp(logf(x_values[i]) + (x - x_values[i])*logfprime(x_values[i])), 
+                          lower = z[i-1], upper = z[i])$value
+            }
+            
+            samples <- 0
+            # Integrals <- Integrals/sum(Integrals)
+            j <- 1
+            while (length(samples) < number_of_samples){
+                u <- runif(1, min = 0, sum(Integrals))
+                u2 <- runif(1)
+                
+                i <- 1
+                Area <- 0
+                while ( (u - Area) >= 0){
+                    i <- i + 1
+                    Area <- sum(Integrals[1:i])
+                    
+                }
+                
+                y <- x_values[i]
+                a <- logf(y)
+                b <- logfprime(y)
+                
+                if (i == 1){
+                    Area <- 0
+                    y2 <- -Inf
+                } else {
+                    Area <- sum(Integrals[1:(i - 1)])
+                    y2 <- z[i-1]
+                }
+
+                c <- exp_env(y2, i)
+                x <- (log((u - Area) * b + c) + y * b - a) / b
+                
+                if (u2 <= (f(x) / exp_env(x,i))) {
+                    samples[j] <- x
+                    j <- j + 1
+
+              }
+                
+              }
+
+              samples
+
+          }
+            
+x_values <- seq(0.01, 2.5 , length.out = 25)
+ff <- function(x){exp(- x^3 + x)}
+flog <- function(x){- x^3 + x}
+fprime <- function(x){-3*x^2 + 1}
+samples <- adaptive_rejection_sampling(ff, flog, fprime , x_values, number_of_samples = 10000)
+hist(samples)
+```
+
+```{r}
+adaptive_rejection_sampling_squeeze <- function(f,
+                                                logf, 
+                                                logfprime,
+                                                x_values, 
+                                                number_of_samples = 10000){
+            # Z_i points. 
+            z <- 0
+            k <- length(x_values)
+            for (i in 1:(k-1) ){
+                z[i] <- (logf(x_values[i+1]) - logf(x_values[i]) - x_values[i+1] * logfprime(x_values[i+1])
+                           + x_values[i] * logfprime(x_values[i]) ) / (logfprime(x_values[i]) - 
+                                                                        logfprime(x_values[i+1]))
+            }
+            
+            # piecewise Envelope
+            env <- function(x, i){
+                   logf(x_values[i]) + (x - x_values[i]) * logfprime(x_values[i])
+            }
+            
+            # Exponential piecewise envelope
+            exp_env <- function(x, i){
+                  exp(logf(x_values[i]) + (x - x_values[i]) * logfprime(x_values[i]))
+            }
+            
+            # Squeeze function
+            squeeze_func <- function(x, i){
+            ((x_values[i] - x) * logf(x_values[i]) + (x - x_values[i]) * logf(x_values[i + 1])) / 
+            (x_values[i + 1] - x_values[i]) 
+            }
+            
+   
+            Integrals <- numeric(k-1)
+            Integrals[1] <- integrate(function(x) exp(logf(x_values[1]) + (x - x_values[1]) * logfprime(x_values[1])),
+                                      lower = 0, upper = z[1])$value
+            for (i in 2:(k-1) ){
+                Integrals[i] <- integrate(function(x) exp(logf(x_values[i]) + (x - x_values[i])*logfprime(x_values[i])), 
+                          lower = z[i-1], upper = z[i])$value
+            }
+            
+            samples <- 0
+            # Integrals <- Integrals/sum(Integrals)
+            j <- 1
+            while (length(samples) < number_of_samples){
+                u <- runif(1, min = 0, sum(Integrals))
+                u2 <- runif(1)
+                
+                i <- 1
+                Area <- 0
+                while ( (u - Area) >= 0){
+                    i <- i + 1
+                    Area <- sum(Integrals[1:i])
+                    
+                }
+                
+                
+                y <- x_values[i]
+                a <- logf(y)
+                b <- logfprime(y)
+                
+                if (i == 1){
+                    Area <- 0
+                    y2 <- -Inf
+                } else {
+                    Area <- sum(Integrals[1:(i - 1)])
+                    y2 <- z[i - 1]
+                }
+
+                c <- exp_env(y2, i)
+                x <- (log((u - Area) * b + c) + y * b - a) / b
+                
+
+                if (u2 <= squeeze_func(x,i) / exp_env(x, i)){
+                      samples[j] <- x
+                      j <- j + 1
+                } else if (u2 <= (f(x) / exp_env(x, i))) {
+                    samples[j] <- x
+                    j <- j + 1
+
+              }
+                
+              }
+
+              samples
+}
+x_values <- seq(0.01, 2.5 , length.out = 25)
+ff <- function(x){exp(- x^3 + x)}
+flog <- function(x){- x^3 + x}
+fprime <- function(x){-3*x^2 + 1}
+samples <- adaptive_rejection_sampling_squeeze(ff, flog, fprime , x_values, number_of_samples = 100000)
+hist(samples, breaks = 200)
+
+```
+```{r}
+library(microbenchmark)
+test <- microbenchmark(adaptive_rejection_sampling_squeeze(ff, flog, fprime , x_values, number_of_samples = 10000),
+               adaptive_rejection_sampling(ff, flog, fprime , x_values, number_of_samples = 10000),
+               rejection_sampling(ff, envolope = envolope1 , number_of_iteration =  10000))
+```
+```{r}
+
+# test with other distributions
+
+target_f1 <- function(x){ exp(-x^2) }
+target_f1_log <- function(x){-x^2 }
+target_f1_logdif <-function(x){-2*x} 
+ini <- seq(0,5, length.out = 25)
+samples <- adaptive_rejection_sampling(target_f1, target_f1_log, target_f1_logdif, ini, number_of_samples = 100000 )
+hist(samples, breaks = 100)
+
+# another test
+target_f2 <- function(x){ exp(-(x/2)^4 + 10) }
+target_f2_log <- function(x){-(x/2)^4 + 10}
+target_f2_logdif <-function(x){-4*(x/2)^3} 
+ini <- seq(0,5, length.out = 25)
+samples <- adaptive_rejection_sampling(target_f2, target_f2_log, target_f2_logdif, ini, number_of_samples = 100000 )
+hist(samples, breaks = 25)
+```
+
+```{r}
+# Equation (6.8) in the book. Returns a vector of z_i points
+z_points <- function(x ,k, logf, logfprime){
+            z <- 0
+            for (i in 1:(k-1) ){
+                a <- logf(x[i + 1]) - logf(x[i]) 
+                b <-  x[i + 1] * logfprime(x[i + 1]) - x[i] * logfprime(x[i])
+                c <- logfprime(x[i]) - logfprime(x[i + 1]) 
+                z[i] <- (a - b)/c
+            }
+            return(z)
+}
+
+# Returns a sum of the pieacewise areas
+# up the the area containing x
+evaluate_area <- function(u, integral_area, z){
+                i <- 1
+                Area <- 0
+                while ( (u - Area) >= 0){
+                    i <- i + 1
+                    Area <- sum(integral_area[1:i])
+                }
+                if (i == 1){
+                    Area <- 0
+                    tmp <- -Inf
+                } else {
+                    Area <- sum(integral_area[1:(i - 1)])
+                    tmp <- z[i-1]
+                }
+                out <- list(i = i, h = tmp, Area = Area)
+}
+
+
+adaptive_rejection_sampling_p <- function(f,
+                                          logf, 
+                                          logfprime,
+                                          y, 
+                                          number_of_samples = 10000){
+            samples <- 0
+            j <- 1
+            z <- 0
+            k <- length(y)
+            # Z_i points. 
+            z <- z_points(y, k , logf , logfprime)
+      
+            # Exponential piecewise envelope
+            exp_env <- function(x, i){
+                  exp(logf(y[i]) + (x - y[i]) * logfprime(y[i]))
+            }
+            
+            # Making a list of Areas
+            integral_areas <- function( list_of_integrals ,k){
+                    list_of_integrals[1] <- integrate(exp_env, i = 1, 
+                                              lower = 0, 
+                                              upper = z[1])$value
+                    for (i in 2:(k-1) ){
+                        list_of_integrals[i] <- integrate(exp_env, i = i,
+                                                  lower = z[i-1], 
+                                                  upper = z[i])$value
+                    }
+                    return(list_of_integrals)
+            }
+            
+            Integrals <- integral_areas( numeric(k-1) , k)
+            
+            while (length(samples) < number_of_samples){
+                # Picking from uniform distribution
+                u <- runif(1, min = 0, sum(Integrals))
+                u2 <- runif(1)
+                
+                # Summing all the areas up to the
+                # interval [z[i-1], z[i]] which x is contained in
+                tmp <- evaluate_area(u, Integrals, z)
+                h <-  tmp$h
+                i <- tmp$i
+                Area <- tmp$Area
+                
+                # Getting x = F(U)^{-1}
+                a <- logf(y[i])
+                b <- logfprime(y[i])
+                c <- exp_env(h, i)
+                x <- (log((u - Area) * b + c) + y[i] * b - a) / b
+                
+                if (u2 <= (f(x) / exp_env(x,i))) {
+                    samples[j] <- x
+                    j <- j + 1
+
+                  }
+                
+              }
+              return(samples)
+}
+x_values <- seq(0.01, 2.5 , length.out = 20)
+ff <- function(x){exp(- x^3 + x)}
+flog <- function(x){- x^3 + x}
+fprime <- function(x){-3*x^2 + 1}
+samples <- adaptive_rejection_sampling_p(ff, flog, fprime , x_values, number_of_samples = 10000)
+hist(samples, breaks = 40, prob = T)
+```
+
+
+
+
