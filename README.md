@@ -1,7 +1,7 @@
 # KU-Computational-Statistics
 This repository includes my assignments for the Computational Statistics course at KU.
 
-This course covered the follwing topics:
+The course covered the following topics:
 
 - Maximum-likelihood and numerical optimization.
 - The EM-algorithm.
