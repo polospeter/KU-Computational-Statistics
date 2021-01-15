@@ -19,12 +19,12 @@ The course covered the following topics:
 
 #### Assignment 2:
 
-- [Assignment 2](https://github.com/polospeter/Tensorflow-in-Practise-specialisation/blob/main/Course%201%20-%20Introduction%20to%20TensorFlow%20for%20AI%2C%20ML%20and%20DL/Week%204/Exercise4-Question.ipynb)
+- [Assignment 2]()
 
 #### Assignment 3: EM-algorithm
 
-- [Assignment 3](https://github.com/polospeter/Tensorflow-in-Practise-specialisation/blob/main/Course%201%20-%20Introduction%20to%20TensorFlow%20for%20AI%2C%20ML%20and%20DL/Week%204/Exercise4-Question.ipynb)
+- [Assignment 3]()
 
 #### Assignment 4: Gibbs sampling
 
-- [Assignment 4](https://github.com/polospeter/Tensorflow-in-Practise-specialisation/blob/main/Course%201%20-%20Introduction%20to%20TensorFlow%20for%20AI%2C%20ML%20and%20DL/Week%204/Exercise4-Question.ipynb)
+- [Assignment 4]()
