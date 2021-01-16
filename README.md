@@ -3,7 +3,7 @@ This repository includes my assignments for the Computational Statistics course 
 
 The course covered the following topics:
 
-- Maximum-likelihood and numerical optimization.
+- Maximum-likelihood and numerical optimization
 - The EM-algorithm.
 - Stochastic optimization algorithms.
 - Simulation algorithms and Monte Carlo methods.
