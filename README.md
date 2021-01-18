@@ -19,7 +19,7 @@ The course covered the following topics:
 
 #### Assignment 2:
 
-- [Assignment 2]()
+- [Assignment 2](https://github.com/polospeter/KU-Computational-Statistics-course/blob/main/Assignment%202/Assignment%202A%20-%20Rejection%20sampling.R)
 
 #### Assignment 3: EM-algorithm
 
