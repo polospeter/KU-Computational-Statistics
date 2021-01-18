@@ -15,7 +15,7 @@ The course covered the following topics:
 
 #### Assignment 1: Density estimation
 
-- [Assignment 1](https://github.com/polospeter/KU-Computational-Statistics-course/tree/main/Assignment%201)
+- [Assignment 1 - Density Estimation](https://github.com/polospeter/KU-Computational-Statistics-course/blob/main/Assignment%201/Assignment%201A%20-%20Density%20estimation.R)
 
 #### Assignment 2:
 
