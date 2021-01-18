@@ -23,7 +23,7 @@ The course covered the following topics:
 
 #### Assignment 3: EM-algorithm
 
-- [Assignment 3]()
+- [Assignment 3](https://github.com/polospeter/KU-Computational-Statistics-course/blob/main/Assignment%203/Assignment%203B%20-%20EM%20algorithm.R)
 
 #### Assignment 4: Gibbs sampling
 
