@@ -15,7 +15,7 @@ The course covered the following topics:
 
 #### Assignment 1: Density estimation
 
-- [Assignment 1 - Density Estimation](https://github.com/polospeter/KU-Computational-Statistics-course/blob/main/Assignment%201/Assignment%201A%20-%20Density%20estimation.R)
+- [Assignment 1](https://github.com/polospeter/KU-Computational-Statistics-course/blob/main/Assignment%201/Assignment%201A%20-%20Density%20estimation.R)
 
 #### Assignment 2:
 
@@ -27,4 +27,4 @@ The course covered the following topics:
 
 #### Assignment 4: Gibbs sampling
 
-- [Assignment 4]()
+- [Assignment 4](https://github.com/polospeter/KU-Computational-Statistics-course/blob/main/Assignment%204/Assignment%204B%20-%20Gibbs%20sampling.R)
